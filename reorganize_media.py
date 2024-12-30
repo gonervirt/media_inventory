@@ -10,8 +10,10 @@ def setup_parser():
     parser = argparse.ArgumentParser(description='Reorganize media files based on inventory')
     parser.add_argument('--prod', action='store_true', 
                        help='Execute the actual file moves. Without this, only shows planned moves')
-    parser.add_argument('--root', type=str, default='organized_media',
-                       help='Root directory for organized files (default: organized_media)')
+    parser.add_argument('--input-dir', type=str, required=True,
+                       help='Root directory containing the media files to organize')
+    parser.add_argument('--output-dir', type=str, required=True,
+                       help='Output directory for organized files')
     parser.add_argument('--inventory', type=str, default='media_inventory.xlsx',
                        help='Path to the media inventory Excel file (default: media_inventory.xlsx)')
     return parser
@@ -26,13 +28,18 @@ def load_inventory(file_path):
         if missing_columns:
             raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
         
+        # Ensure Country and City columns exist, if not, add them with NaN values
+        for col in ['Country', 'City']:
+            if col not in df.columns:
+                df[col] = pd.NA
+        
         return df
     except Exception as e:
         print(f"Error loading inventory file: {e}")
         return None
 
 def plan_file_moves(df, root_dir):
-    """Plan file moves based on dates."""
+    """Plan file moves based on dates and location."""
     moves = []
     errors = []
     
@@ -48,7 +55,14 @@ def plan_file_moves(df, root_dir):
             year = str(photo_date.year)
             date_str = photo_date.strftime('%Y-%m-%d')
             
-            # Create target path
+            # Add location information to date directory if available
+            if pd.notna(row['City']):
+                if pd.notna(row['Country']) and row['Country'].strip().lower() != 'france':
+                    date_str = f"{date_str}_{row['Country'].strip()}_{row['City'].strip()}"
+                else:
+                    date_str = f"{date_str}_{row['City'].strip()}"
+            
+            # Create target path (only 2 levels: year/date_location)
             target_dir = os.path.join(root_dir, year, date_str)
             filename = os.path.basename(source_path)
             target_path = os.path.join(target_dir, filename)
@@ -120,7 +134,7 @@ def main():
     
     # Plan moves
     print("\nPlanning file organization...")
-    moves, errors = plan_file_moves(df, args.root)
+    moves, errors = plan_file_moves(df, args.output_dir)
     
     if errors:
         print("\nErrors during planning:")
