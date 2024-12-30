@@ -2,3 +2,4 @@ inventory_status.txt
 media_inventory_checkpoint_*.xlsx
 media_inventory.xlsx
 processed_files.txt
+planned_moves.xlsx

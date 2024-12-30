@@ -255,15 +255,17 @@ def get_location_info(lat, lon):
         print(f"Geocoding error for coordinates ({lat}, {lon}): {str(e)}")
     return '', ''
 
-def process_gps_batch(media_files, batch_size=50):
+def process_gps_batch(media_files, lookup_locations=False, batch_size=50):
     """Process GPS coordinates in batches to update location information."""
+    if not lookup_locations:
+        return
+
     batch = []
     locations_cache = {}
     
     for file_info in media_files:
         if 'GPS Coordinates' in file_info and file_info['GPS Coordinates']:
             try:
-                # Parse the GPS string
                 lat, lon = map(float, file_info['GPS Coordinates'].split(','))
                 batch.append((file_info, lat, lon))
                 
@@ -273,7 +275,6 @@ def process_gps_batch(media_files, batch_size=50):
             except Exception as e:
                 print(f"Error parsing GPS coordinates for {file_info['File Name']}: {str(e)}")
     
-    # Process remaining items
     if batch:
         process_location_batch(batch, locations_cache)
 
@@ -291,7 +292,7 @@ def process_location_batch(batch, locations_cache):
         file_info['Country'] = country
         file_info['City'] = city
 
-def scan_directories(root_dirs, max_workers=None, test_limit=None):
+def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_limit=None):
     """Scan directories recursively for media files."""
     print("\n=== Photo Inventory Process Started ===")
     print("Initializing...")
@@ -422,9 +423,11 @@ def scan_directories(root_dirs, max_workers=None, test_limit=None):
                 continue
         
         # Process GPS coordinates in batches
+        print(lookup_locations)
         if media_files:
-            print("\nProcessing location information...")
-            process_gps_batch(media_files)
+            if lookup_locations:
+                print("\nProcessing location information...")
+                process_gps_batch(media_files, lookup_locations)
             
         # Save final results
         print("\nSaving final results...")
@@ -442,6 +445,7 @@ def main():
     parser = argparse.ArgumentParser(description='Media Inventory Scanner')
     parser.add_argument('--test', type=int, help='Limit processing to specified number of files (for testing)')
     parser.add_argument('--dirs', nargs='+', help='Directories to scan (optional)')
+    parser.add_argument('--lookup-locations', action='store_true', help='Enable GPS location lookup (slower processing)')
     args = parser.parse_args()
     
     # List of directories to scan
@@ -459,7 +463,7 @@ def main():
     for dir in directories_to_scan:
         print(f"- {dir}")
     
-    media_files = scan_directories(directories_to_scan, test_limit=args.test)
+    media_files = scan_directories(directories_to_scan, lookup_locations=args.lookup_locations, test_limit=args.test)
     
     if media_files:
         export_to_excel(media_files, 'media_inventory.xlsx')
@@ -470,10 +474,11 @@ def main():
         print("- Media types (Photo/Video)")
         print("- Resolutions")
         print("- GPS coordinates")
+        if args.lookup_locations:
+            print("- Country and city (extracted from GPS coordinates)")
         print("- File sizes (in MB and bytes)")
         print("- Creation and modified dates")
         print("- Photo date (extracted from EXIF, filename, or file system)")
-        print("- Country and city (extracted from GPS coordinates)")
     else:
         print("\nNo media files were found in the specified directories.")
 
