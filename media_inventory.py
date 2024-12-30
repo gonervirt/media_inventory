@@ -96,6 +96,8 @@ def extract_date_from_filename(filename):
         r'(\d{2}[-_]?\d{2}[-_]?\d{4})',  # DD-MM-YYYY or DDMMYYYY
         r'IMG[-_]?(\d{8})',  # IMG_YYYYMMDD
         r'(\d{8})[-_]\d+',   # YYYYMMDD_sequence
+        r'VID[-_]?(\d{8})',  # VID_YYYYMMDD
+        r'VIDEO[-_]?(\d{8})' # VIDEO_YYYYMMDD
     ]
     
     for pattern in patterns:
@@ -150,12 +152,13 @@ def get_file_type(file_path):
             return 'Photo'
         elif mime.startswith('video/') and ext in video_extensions:
             return 'Video'
-    except:
         # If mime type check fails, fall back to extension only
         if ext in photo_extensions:
             return 'Photo'
         elif ext in video_extensions:
             return 'Video'
+    except:
+        return None
     return None
 
 def save_checkpoint(media_files, processed_files, checkpoint_file, count):
@@ -397,7 +400,7 @@ def scan_directories(root_dirs, max_workers=None, test_limit=None):
                         resolution = get_video_metadata(file_path)
                         file_info['Resolution'] = resolution
                         file_info['GPS Coordinates'] = None
-                        file_info['Photo Date'] = min(creation_date, modified_date)  # Use earliest file system date for videos
+                        file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])  # Use earliest file system date for videos
                     
                     media_files.append(file_info)
                     processed_files.add(file_path)
@@ -443,10 +446,11 @@ def main():
     
     # List of directories to scan
     directories_to_scan = args.dirs if args.dirs else [
-        os.path.expanduser("~/Pictures"),
-        os.path.expanduser("~/Videos"),
-        os.path.expanduser("~/Downloads"),
-        os.path.expanduser("C:/Users/sebas/OneDrive/Images"),  # Often contains media files
+        #os.path.expanduser("~/Pictures"),
+        #os.path.expanduser("~/Videos"),
+        #os.path.expanduser("~/Downloads"),
+        #os.path.expanduser("C:/Users/sebas/OneDrive/Images"),  # Often contains media files
+        os.path.expanduser("C:/photo/src")
         # Add more directories as needed
     ]
     
