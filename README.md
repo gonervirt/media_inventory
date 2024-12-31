@@ -64,3 +64,5 @@ This script scans specified directories for photos and videos, collecting inform
 - .flv
 - .mkv
 - .webm
+
+"C:/Users/sebas/OneDrive/Documents/dev/python/photo inventory 2/media_inventory/.venv/Scripts/python.exe" "c:/Users/sebas/OneDrive/Documents/dev/python/photo inventory 2/media_inventory/reorganize_media.py" --inventory media_inventory.xlsx --root C:/photo/dest --prod

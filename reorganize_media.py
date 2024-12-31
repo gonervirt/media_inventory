@@ -20,7 +20,7 @@ def load_inventory(file_path):
     """Load and validate the media inventory Excel file."""
     try:
         df = pd.read_excel(file_path)
-        required_columns = ['File Path', 'Photo Date', 'Duplicate Status']
+        required_columns = ['File Path', 'Photo Date']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:
@@ -40,18 +40,12 @@ def plan_file_moves(df, root_dir):
     """Plan file moves based on dates and location."""
     moves = []
     errors = []
-    skipped = []
     
     for _, row in df.iterrows():
         try:
             source_path = row['File Path']
             if not os.path.exists(source_path):
                 errors.append(f"Source file not found: {source_path}")
-                continue
-            
-            # Skip files marked as duplicates
-            if row['Duplicate Status'].lower() == 'duplicate':
-                skipped.append(f"Skipping duplicate file: {source_path}")
                 continue
             
             # Convert date to required format
@@ -69,12 +63,6 @@ def plan_file_moves(df, root_dir):
             # Create target path (only 2 levels: year/date_location)
             target_dir = os.path.join(root_dir, year, date_str)
             filename = os.path.basename(source_path)
-            
-            # If duplicate status is 'error', add suffix to filename
-            if row['Duplicate Status'].lower() == 'error':
-                base_name, ext = os.path.splitext(filename)
-                filename = f"{base_name}_conflict{ext}"
-            
             target_path = os.path.join(target_dir, filename)
             
             # Handle duplicate filenames
@@ -89,12 +77,6 @@ def plan_file_moves(df, root_dir):
             
         except Exception as e:
             errors.append(f"Error processing {row['File Path']}: {str(e)}")
-    
-    # Print skipped files
-    if skipped:
-        print("\nSkipped files:")
-        for skip_msg in skipped:
-            print(f"  - {skip_msg}")
     
     return moves, errors
 

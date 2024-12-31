@@ -4,3 +4,5 @@ Pillow>=10.0.0
 moviepy>=1.0.3
 python-magic-bin>=0.4.14
 geopy
+hachoir
+exifread

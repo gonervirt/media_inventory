@@ -14,6 +14,10 @@ from functools import lru_cache
 import math
 from time import sleep
 import concurrent.futures
+from hachoir.parser import createParser
+from hachoir.metadata import extractMetadata
+import warnings
+import exifread
 
 try:
     from moviepy import VideoFileClip
@@ -127,6 +131,58 @@ def get_video_metadata(file_path):
             return "Resolution unavailable (moviepy not installed)"
     except Exception as e:
         print(f"Error processing video {file_path}: {str(e)}")
+    return None
+
+def get_video_gps(file_path):
+    """Extract GPS coordinates from video metadata using exifread."""
+    try:
+        # First try exifread
+        with open(file_path, 'rb') as f:
+            tags = exifread.process_file(f)
+            
+            # Look for GPS tags
+            if 'GPS GPSLatitude' in tags and 'GPS GPSLongitude' in tags:
+                lat = convert_to_degrees(tags['GPS GPSLatitude'].values)
+                lon = convert_to_degrees(tags['GPS GPSLongitude'].values)
+                
+                # Check for reference (N/S, E/W)
+                if 'GPS GPSLatitudeRef' in tags:
+                    if str(tags['GPS GPSLatitudeRef']) == 'S':
+                        lat = -lat
+                if 'GPS GPSLongitudeRef' in tags:
+                    if str(tags['GPS GPSLongitudeRef']) == 'W':
+                        lon = -lon
+                
+                return f"{lat:.6f}, {lon:.6f}"
+        
+        # If no GPS found with exifread, try hachoir as fallback
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            parser = createParser(file_path)
+            if parser:
+                with parser:
+                    metadata = extractMetadata(parser)
+                    if metadata:
+                        # Try to get GPS data directly from metadata
+                        lat = lon = None
+                        
+                        # Try to extract GPS coordinates from metadata
+                        for item in metadata._Metadata__data:
+                            try:
+                                item_name = str(item.name).lower()
+                                if 'gps' in item_name:
+                                    if 'latitude' in item_name:
+                                        lat = float(str(item.value))
+                                    elif 'longitude' in item_name:
+                                        lon = float(str(item.value))
+                            except (ValueError, TypeError, AttributeError):
+                                continue
+                        
+                        if lat is not None and lon is not None:
+                            return f"{lat:.6f}, {lon:.6f}"
+                    
+    except Exception as e:
+        print(f"Error extracting GPS from video {file_path}: {str(e)}")
     return None
 
 def process_videos_in_parallel(video_files, max_workers=None):
@@ -445,9 +501,9 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limi
                         file_info['Photo Date'] = (photo_date or 
                                                  extract_date_from_filename(file_data['file_name']) or 
                                                  min(creation_date, modified_date))
-                    else:  # Video - just collect paths for now
+                    else:  # Video
                         file_info['Resolution'] = None  # Will be updated later
-                        file_info['GPS Coordinates'] = None
+                        file_info['GPS Coordinates'] = get_video_gps(file_path)
                         file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])
                     
                     media_files.append(file_info)
@@ -511,11 +567,12 @@ def main():
     
     # List of directories to scan
     directories_to_scan = args.dirs if args.dirs else [
+        os.path.expanduser("C:/photo/dest"),
         #os.path.expanduser("~/Pictures"),
         #os.path.expanduser("~/Videos"),
         #os.path.expanduser("~/Downloads"),
-        os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
-        os.path.expanduser("C:/photo/src")
+        #os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
+        os.path.expanduser("C:/photo/phone")
         # Add more directories as needed
     ]
     
