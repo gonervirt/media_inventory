@@ -292,6 +292,21 @@ def process_location_batch(batch, locations_cache):
         file_info['Country'] = country
         file_info['City'] = city
 
+def get_duplicate_status(filename, filesize, file_registry):
+    """Determine if a file is a duplicate based on name and size."""
+    if filename not in file_registry:
+        file_registry[filename] = {'sizes': set(), 'count': 0}
+        file_registry[filename]['sizes'].add(filesize)
+        file_registry[filename]['count'] += 1
+        return 'ok'
+    else:
+        file_registry[filename]['count'] += 1
+        if filesize in file_registry[filename]['sizes']:
+            return 'duplicate'
+        else:
+            file_registry[filename]['sizes'].add(filesize)
+            return 'error'
+
 def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_limit=None):
     """Scan directories recursively for media files."""
     print("\n=== Photo Inventory Process Started ===")
@@ -351,14 +366,17 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
     if total_files > 0:
         print("\nProcessing files...")
         
-        # Process files one by one
+        # Initialize file registry for duplicate tracking
+        file_registry = {}
+        media_files = []
+        
+        # First pass: Process file metadata and duplicates
         for idx, file_data in enumerate(files_to_process, 1):
             try:
-                # Check if we've hit the test limit
                 if test_limit and idx > test_limit:
                     print(f"\nTest limit of {test_limit} files reached. Stopping...")
                     break
-                    
+                
                 file_path = file_data['file_path']
                 file_type = get_file_type(file_path)
                 
@@ -370,6 +388,10 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                     creation_date = datetime.fromtimestamp(file_stats.st_ctime).date()
                     modified_date = datetime.fromtimestamp(file_stats.st_mtime).date()
                     
+                    # Check duplicate status first
+                    duplicate_status = get_duplicate_status(file_data['file_name'], file_size_bytes, file_registry)
+                    
+                    # Build base file info
                     file_info = {
                         'File Path': file_path,
                         'File Name': file_data['file_name'],
@@ -378,30 +400,22 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                         'Size (Bytes)': file_size_bytes,
                         'Size (MB)': round(file_size_bytes / (1024 * 1024), 2),
                         'Creation Date': creation_date,
-                        'Modified Date': modified_date
+                        'Modified Date': modified_date,
+                        'Duplicate Status': duplicate_status
                     }
                     
+                    # Process type-specific metadata
                     if file_type == 'Photo':
                         resolution, gps, photo_date = get_image_metadata(file_path)
                         file_info['Resolution'] = resolution
                         file_info['GPS Coordinates'] = gps
-                        
-                        # Try to get date in this order: EXIF > filename > file system
-                        if photo_date:
-                            file_info['Photo Date'] = photo_date
-                        else:
-                            # Try to extract date from filename
-                            filename_date = extract_date_from_filename(file_data['file_name'])
-                            if filename_date:
-                                file_info['Photo Date'] = filename_date
-                            else:
-                                # Use the earlier of creation or modified date
-                                file_info['Photo Date'] = min(creation_date, modified_date)
+                        file_info['Photo Date'] = (photo_date or 
+                                                 extract_date_from_filename(file_data['file_name']) or 
+                                                 min(creation_date, modified_date))
                     else:  # Video
-                        resolution = get_video_metadata(file_path)
-                        file_info['Resolution'] = resolution
+                        file_info['Resolution'] = get_video_metadata(file_path)
                         file_info['GPS Coordinates'] = None
-                        file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])  # Use earliest file system date for videos
+                        file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])
                     
                     media_files.append(file_info)
                     processed_files.add(file_path)
@@ -412,7 +426,7 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                 print(f"\rProcessed: {idx}/{total_files} ({percentage:.1f}%) - Current: {file_data['file_name']}", 
                       end="", flush=True)
                 
-                # Save checkpoint every 1000 files
+                # Checkpoint every 1000 files
                 if idx % 1000 == 0:
                     print(f"\nSaving checkpoint at {idx} files...")
                     save_checkpoint(media_files, processed_files, checkpoint_file, idx)
@@ -422,13 +436,11 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                 print(f"\nSkipping {file_data['file_name']}: {str(e)}")
                 continue
         
-        # Process GPS coordinates in batches
-        print(lookup_locations)
-        if media_files:
-            if lookup_locations:
-                print("\nProcessing location information...")
-                process_gps_batch(media_files, lookup_locations)
-            
+        # Second pass: Process GPS coordinates if enabled
+        if media_files and lookup_locations:
+            print("\nProcessing location information...")
+            process_gps_batch(media_files, lookup_locations)
+        
         # Save final results
         print("\nSaving final results...")
         save_checkpoint(media_files, processed_files, checkpoint_file, files_processed)
