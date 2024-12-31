@@ -132,16 +132,31 @@ def get_video_metadata(file_path):
 def process_videos_in_parallel(video_files, max_workers=None):
     """Process video files in parallel to get their resolutions."""
     resolutions = {}
+    total_videos = len(video_files)
+    completed = 0
+
+    print(f"\nProcessing {total_videos} videos...")
+    
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_file = {executor.submit(get_video_metadata, file): file for file in video_files}
+        
         for future in concurrent.futures.as_completed(future_to_file):
             file = future_to_file[future]
             try:
                 resolution = future.result()
                 resolutions[file] = resolution
+                
+                # Update progress
+                completed += 1
+                percentage = (completed / total_videos) * 100
+                print(f"\rVideo processing progress: {completed}/{total_videos} ({percentage:.1f}%) - Current: {os.path.basename(file)}", 
+                      end="", flush=True)
+                
             except Exception as e:
-                print(f"Error processing {file}: {str(e)}")
+                print(f"\nError processing {file}: {str(e)}")
                 resolutions[file] = None
+    
+    print("\nVideo processing completed.")
     return resolutions
 
 def get_file_type(file_path):
