@@ -161,8 +161,11 @@ def get_file_type(file_path):
         return None
     return None
 
-def save_checkpoint(media_files, processed_files, checkpoint_file, count):
+def save_checkpoint(media_files, processed_files, checkpoint_file, count, enable_checkpoints=False):
     """Save current progress to files."""
+    if not enable_checkpoints:
+        return
+        
     try:
         # Create a backup of the previous checkpoint file if it exists
         if os.path.exists(checkpoint_file):
@@ -307,7 +310,7 @@ def get_duplicate_status(filename, filesize, file_registry):
             file_registry[filename]['sizes'].add(filesize)
             return 'error'
 
-def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_limit=None):
+def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_limit=None, enable_checkpoints=False):
     """Scan directories recursively for media files."""
     print("\n=== Photo Inventory Process Started ===")
     print("Initializing...")
@@ -320,8 +323,8 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
     checkpoint_file = 'processed_files.txt'
     files_processed = 0
     
-    # Load previously processed files
-    if os.path.exists(checkpoint_file):
+    # Load previously processed files only if checkpoints are enabled
+    if enable_checkpoints and os.path.exists(checkpoint_file):
         print("Loading previously processed files...")
         with open(checkpoint_file, 'r', encoding='utf-8') as f:
             processed_files = set(line.strip() for line in f)
@@ -426,10 +429,10 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                 print(f"\rProcessed: {idx}/{total_files} ({percentage:.1f}%) - Current: {file_data['file_name']}", 
                       end="", flush=True)
                 
-                # Checkpoint every 1000 files
-                if idx % 1000 == 0:
+                # Checkpoint every 1000 files if enabled
+                if enable_checkpoints and idx % 1000 == 0:
                     print(f"\nSaving checkpoint at {idx} files...")
-                    save_checkpoint(media_files, processed_files, checkpoint_file, idx)
+                    save_checkpoint(media_files, processed_files, checkpoint_file, idx, enable_checkpoints)
                     print("Continuing...")
                 
             except Exception as e:
@@ -441,9 +444,10 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
             print("\nProcessing location information...")
             process_gps_batch(media_files, lookup_locations)
         
-        # Save final results
-        print("\nSaving final results...")
-        save_checkpoint(media_files, processed_files, checkpoint_file, files_processed)
+        # Save final results if checkpoints are enabled
+        if enable_checkpoints:
+            print("\nSaving final results...")
+            save_checkpoint(media_files, processed_files, checkpoint_file, files_processed, enable_checkpoints)
         print("\n=== Process Completed Successfully ===")
         print(f"Total files processed: {files_processed}")
         print(f"Media files found: {len(media_files)}")
@@ -458,6 +462,7 @@ def main():
     parser.add_argument('--test', type=int, help='Limit processing to specified number of files (for testing)')
     parser.add_argument('--dirs', nargs='+', help='Directories to scan (optional)')
     parser.add_argument('--lookup-locations', action='store_true', help='Enable GPS location lookup (slower processing)')
+    parser.add_argument('--enable-checkpoints', action='store_true', help='Enable writing checkpoint files to disk')
     args = parser.parse_args()
     
     # List of directories to scan
@@ -475,7 +480,12 @@ def main():
     for dir in directories_to_scan:
         print(f"- {dir}")
     
-    media_files = scan_directories(directories_to_scan, lookup_locations=args.lookup_locations, test_limit=args.test)
+    media_files = scan_directories(
+        directories_to_scan, 
+        lookup_locations=args.lookup_locations, 
+        test_limit=args.test,
+        enable_checkpoints=args.enable_checkpoints
+    )
     
     if media_files:
         export_to_excel(media_files, 'media_inventory.xlsx')
