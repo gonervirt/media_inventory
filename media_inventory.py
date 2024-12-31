@@ -13,6 +13,7 @@ from geopy.exc import GeocoderTimedOut
 from functools import lru_cache
 import math
 from time import sleep
+import concurrent.futures
 
 try:
     from moviepy import VideoFileClip
@@ -121,14 +122,27 @@ def get_video_metadata(file_path):
         if MOVIEPY_AVAILABLE:
             with VideoFileClip(file_path) as clip:
                 width, height = clip.size
-                resolution = f"{width}x{height}"
-                return resolution
+                return f"{width}x{height}"
         else:
             return "Resolution unavailable (moviepy not installed)"
     except Exception as e:
-        print (e)
-        pass
+        print(f"Error processing video {file_path}: {str(e)}")
     return None
+
+def process_videos_in_parallel(video_files, max_workers=None):
+    """Process video files in parallel to get their resolutions."""
+    resolutions = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_file = {executor.submit(get_video_metadata, file): file for file in video_files}
+        for future in concurrent.futures.as_completed(future_to_file):
+            file = future_to_file[future]
+            try:
+                resolution = future.result()
+                resolutions[file] = resolution
+            except Exception as e:
+                print(f"Error processing {file}: {str(e)}")
+                resolutions[file] = None
+    return resolutions
 
 def get_file_type(file_path):
     """Determine if the file is a photo or video based on extension and content."""
@@ -311,7 +325,7 @@ def get_duplicate_status(filename, filesize, file_registry):
             file_registry[filename]['sizes'].add(filesize)
             return 'error'
 
-def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_limit=None, enable_checkpoints=False):
+def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limit=None, enable_checkpoints=False):
     """Scan directories recursively for media files."""
     print("\n=== Photo Inventory Process Started ===")
     print("Initializing...")
@@ -416,8 +430,8 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                         file_info['Photo Date'] = (photo_date or 
                                                  extract_date_from_filename(file_data['file_name']) or 
                                                  min(creation_date, modified_date))
-                    else:  # Video
-                        file_info['Resolution'] = get_video_metadata(file_path)
+                    else:  # Video - just collect paths for now
+                        file_info['Resolution'] = None  # Will be updated later
                         file_info['GPS Coordinates'] = None
                         file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])
                     
@@ -440,6 +454,20 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=None, test_l
                 print(f"\nSkipping {file_data['file_name']}: {str(e)}")
                 continue
         
+        # Process video resolutions in parallel
+        video_files = [(file_info, file_info['File Path']) 
+                      for file_info in media_files 
+                      if file_info['Type'] == 'Video']
+        
+        if video_files:
+            print("\nProcessing video resolutions in parallel...")
+            video_paths = [v[1] for v in video_files]
+            resolutions = process_videos_in_parallel(video_paths, max_workers)
+            
+            # Update video resolutions in media_files
+            for file_info, file_path in video_files:
+                file_info['Resolution'] = resolutions.get(file_path)
+
         # Second pass: Process GPS coordinates if enabled
         if media_files and lookup_locations:
             print("\nProcessing location information...")
