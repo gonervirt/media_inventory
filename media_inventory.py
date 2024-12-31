@@ -15,7 +15,7 @@ import math
 from time import sleep
 
 try:
-    from moviepy.editor import VideoFileClip
+    from moviepy import VideoFileClip
     MOVIEPY_AVAILABLE = True
 except ImportError:
     MOVIEPY_AVAILABLE = False
@@ -125,7 +125,8 @@ def get_video_metadata(file_path):
                 return resolution
         else:
             return "Resolution unavailable (moviepy not installed)"
-    except:
+    except Exception as e:
+        print (e)
         pass
     return None
 
