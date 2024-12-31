@@ -514,7 +514,7 @@ def main():
         #os.path.expanduser("~/Pictures"),
         #os.path.expanduser("~/Videos"),
         #os.path.expanduser("~/Downloads"),
-        #os.path.expanduser("C:/Users/sebas/OneDrive/Images"),  # Often contains media files
+        os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
         os.path.expanduser("C:/photo/src")
         # Add more directories as needed
     ]
