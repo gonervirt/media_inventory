@@ -591,9 +591,10 @@ def main():
         #os.path.expanduser("~/Downloads"),
         #os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
         #os.path.expanduser("C:/photo/phone"),
-        os.path.expanduser("C:/photo/dell/dest"),
-        os.path.expanduser("C:/photo/dell/na"),
-        os.path.expanduser("C:/photo/dell/src"),
+        #os.path.expanduser("C:/photo/dell/dest"),
+        #os.path.expanduser("C:/photo/dell/na"),
+        #os.path.expanduser("C:/photo/dell/src"),
+        os.path.expanduser("C:/photo/local"),  
         # Add more directories as needed
     ]
     

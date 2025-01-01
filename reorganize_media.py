@@ -23,7 +23,7 @@ def load_inventory(file_path):
         required_columns = ['File Path', 'Photo Date', 'Duplicate Status']  # Removed Move Status
         missing_columns = [col for col in required_columns if col not in df.columns]
         
-        if missing_columns:
+        if (missing_columns):
             raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
         
         # Ensure Country and City columns exist, if not, add them with NaN values
@@ -80,18 +80,23 @@ def plan_file_moves(df, root_dir):
             filename = os.path.basename(source_path)
             target_path = os.path.join(target_dir, filename)
             
-            # Check if file is already in the right place
-            if os.path.dirname(source_path) == target_dir:
+            # Fix: Normalize paths and do strict comparison
+            source_dir = os.path.normpath(os.path.dirname(source_path))
+            norm_target_dir = os.path.normpath(target_dir)
+            
+            # Skip if already in correct location - must be before any filename modifications
+            if source_dir == norm_target_dir:
+                print(f"Skipping {filename} - already in correct location")
                 status_counts['skipped'] += 1
                 continue
             
-            # For files marked as 'error', add '_dup' suffix
+            # Only process files that need to be moved
             if duplicate_status == 'error':
                 base_name, ext = os.path.splitext(filename)
                 filename = f"{base_name}_dup{ext}"
                 target_path = os.path.join(target_dir, filename)
             
-            # Handle filename collisions
+            # Handle filename collisions for files that will be moved
             counter = 1
             while os.path.exists(target_path):
                 base_name, ext = os.path.splitext(filename)
@@ -99,6 +104,7 @@ def plan_file_moves(df, root_dir):
                 target_path = os.path.join(target_dir, new_filename)
                 counter += 1
             
+            # Only add to moves if not skipped
             moves.append((source_path, target_path, duplicate_status))
             
         except Exception as e:
@@ -111,6 +117,7 @@ def execute_moves(moves, dry_run=True):
     results = {
         'successful': 0,
         'failed': 0,
+        'skipped': 0,  # Add skipped counter
         'errors': [],
         'moves_df': pd.DataFrame([(s, d, st) for s, d, st in moves], 
                                columns=['Source', 'Destination', 'Status'])
@@ -118,8 +125,16 @@ def execute_moves(moves, dry_run=True):
     
     for source, target, status in moves:
         try:
+            source_dir = os.path.dirname(source)
             target_dir = os.path.dirname(target)
             
+            # Skip if source and target directories are the same
+            if os.path.normpath(source_dir) == os.path.normpath(target_dir):
+                results['skipped'] += 1
+                if dry_run:
+                    print(f"Would skip ({status}):\n  {source}\n  Already in correct location")
+                continue
+                
             if dry_run:
                 print(f"Would move ({status}):\n  From: {source}\n  To: {target}")
             else:
