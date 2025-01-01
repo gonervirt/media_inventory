@@ -386,6 +386,20 @@ def get_duplicate_status(filename, filesize, file_registry):
             file_registry[filename]['sizes'].add(filesize)
             return 'error'
 
+def is_file_in_correct_location(file_path, file_date):
+    """Check if file is already in the correct year-month folder structure."""
+    try:
+        if not file_date:
+            return False
+            
+        # Expected path format: .../YYYY-MM/filename
+        expected_dir = file_date.strftime('%Y-%m')
+        parent_dir = os.path.basename(os.path.dirname(file_path))
+        
+        return parent_dir == expected_dir
+    except Exception:
+        return False
+
 def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limit=None, enable_checkpoints=False):
     """Scan directories recursively for media files."""
     print("\n=== Photo Inventory Process Started ===")
@@ -480,7 +494,8 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limi
                         'Size (MB)': round(file_size_bytes / (1024 * 1024), 2),
                         'Creation Date': creation_date,
                         'Modified Date': modified_date,
-                        'Duplicate Status': duplicate_status
+                        'Duplicate Status': duplicate_status,
+                        'Move Status': 'To Be Determined'  # New field
                     }
                     
                     # Process type-specific metadata
@@ -491,10 +506,22 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limi
                         file_info['Photo Date'] = (photo_date or 
                                                  extract_date_from_filename(file_data['file_name']) or 
                                                  min(creation_date, modified_date))
+                        
+                        # Check if file is already in correct location
+                        if is_file_in_correct_location(file_path, file_info['Photo Date']):
+                            file_info['Move Status'] = 'Already in Place'
+                        else:
+                            file_info['Move Status'] = 'Need to Move'
+                            
                     else:  # Video
                         file_info['Resolution'] = None  # Will be updated later
-                        #file_info['GPS Coordinates'] = get_video_gps(file_path)
                         file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])
+                        
+                        # Check if file is already in correct location
+                        if is_file_in_correct_location(file_path, file_info['Photo Date']):
+                            file_info['Move Status'] = 'Already in Place'
+                        else:
+                            file_info['Move Status'] = 'Need to Move'
 
                     
                     media_files.append(file_info)

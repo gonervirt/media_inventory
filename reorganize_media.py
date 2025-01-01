@@ -10,9 +10,9 @@ def setup_parser():
     parser = argparse.ArgumentParser(description='Reorganize media files based on inventory')
     parser.add_argument('--prod', action='store_true', 
                        help='Execute the actual file moves. Without this, only shows planned moves')
-    parser.add_argument('--root', type=str, default='organized_media',
+    parser.add_argument('--root', type=str, default=os.path.join('organized_media'),
                        help='Root directory for organized files (default: organized_media)')
-    parser.add_argument('--inventory', type=str, default='media_inventory.xlsx',
+    parser.add_argument('--inventory', type=str, default=os.path.join('media_inventory.xlsx'),
                        help='Path to the media inventory Excel file (default: media_inventory.xlsx)')
     return parser
 
@@ -20,7 +20,7 @@ def load_inventory(file_path):
     """Load and validate the media inventory Excel file."""
     try:
         df = pd.read_excel(file_path)
-        required_columns = ['File Path', 'Photo Date', 'Duplicate Status']
+        required_columns = ['File Path', 'Photo Date', 'Duplicate Status']  # Removed Move Status
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:
@@ -37,15 +37,22 @@ def load_inventory(file_path):
         return None
 
 def plan_file_moves(df, root_dir):
-    """Plan file moves based on dates, location, and duplicate status."""
+    """Plan file moves based on dates and location."""
     moves = []
     errors = []
-    status_counts = {'ok': 0, 'duplicate': 0, 'error': 0}
+    status_counts = {
+        'ok': 0, 
+        'duplicate': 0, 
+        'error': 0,
+        'skipped': 0  # For files that don't need moving
+    }
     
     for _, row in df.iterrows():
         try:
             source_path = row['File Path']
             duplicate_status = row['Duplicate Status'].lower()
+            
+            # Update duplicate status counts
             status_counts[duplicate_status] = status_counts.get(duplicate_status, 0) + 1
             
             # Skip files marked as duplicates
@@ -71,18 +78,23 @@ def plan_file_moves(df, root_dir):
             # Create target path (only 2 levels: year/date_location)
             target_dir = os.path.join(root_dir, year, date_str)
             filename = os.path.basename(source_path)
+            target_path = os.path.join(target_dir, filename)
             
-            # For files marked as 'error', add '_dup' suffix before extension
+            # Check if file is already in the right place
+            if os.path.dirname(source_path) == target_dir:
+                status_counts['skipped'] += 1
+                continue
+            
+            # For files marked as 'error', add '_dup' suffix
             if duplicate_status == 'error':
                 base_name, ext = os.path.splitext(filename)
                 filename = f"{base_name}_dup{ext}"
-            
-            target_path = os.path.join(target_dir, filename)
+                target_path = os.path.join(target_dir, filename)
             
             # Handle filename collisions
             counter = 1
-            base_name, ext = os.path.splitext(filename)
             while os.path.exists(target_path):
+                base_name, ext = os.path.splitext(filename)
                 new_filename = f"{base_name}_{counter}{ext}"
                 target_path = os.path.join(target_dir, new_filename)
                 counter += 1
@@ -136,18 +148,22 @@ def main():
     parser = setup_parser()
     args = parser.parse_args()
     
+    # Normalize paths to handle spaces
+    inventory_path = os.path.normpath(args.inventory)
+    root_dir = os.path.normpath(args.root)
+    
     print("Media File Reorganizer")
     print("=====================")
     
-    # Load inventory
-    print(f"\nLoading inventory from {args.inventory}...")
-    df = load_inventory(args.inventory)
+    # Load inventory with normalized path
+    print(f"\nLoading inventory from {inventory_path}...")
+    df = load_inventory(inventory_path)
     if df is None:
         return
     
-    # Plan moves
+    # Plan moves with normalized path
     print("\nPlanning file organization...")
-    moves, errors, status_counts = plan_file_moves(df, args.root)
+    moves, errors, status_counts = plan_file_moves(df, root_dir)
     
     if errors:
         print("\nErrors during planning:")
@@ -165,10 +181,11 @@ def main():
     # Print summary
     print("\nSummary:")
     print(f"  Total files in inventory: {len(df)}")
+    print(f"  Files already in place (skipped): {status_counts.get('skipped', 0)}")
     print(f"  Files marked as OK: {status_counts.get('ok', 0)}")
     print(f"  Files marked as duplicate (skipped): {status_counts.get('duplicate', 0)}")
     print(f"  Files marked for rename: {status_counts.get('error', 0)}")
-    print(f"  Total files to process: {len(moves)}")
+    print(f"  Total files to move: {len(moves)}")
     if args.prod:
         print(f"  Successfully moved: {results['successful']}")
         print(f"  Failed moves: {results['failed']}")
