@@ -581,13 +581,14 @@ def main():
     
     # List of directories to scan
     directories_to_scan = args.dirs if args.dirs else [
-        #os.path.expanduser("C:/photo/dest"),
+        os.path.expanduser("C:/photo/dest"),
         #os.path.expanduser("~/Pictures"),
         #os.path.expanduser("~/Videos"),
         #os.path.expanduser("~/Downloads"),
         #os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
-        #os.path.expanduser("C:/photo/phone")
-        os.path.expanduser("C:/photo/done/src - Copie/google/takeout-20241224T090448Z-003/Takeout")
+        #os.path.expanduser("C:/photo/phone"),
+        os.path.expanduser("C:/photo/dell/dest"),
+        os.path.expanduser("C:/photo/dell/na"),
         # Add more directories as needed
     ]
     

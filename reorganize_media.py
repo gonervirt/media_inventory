@@ -20,7 +20,7 @@ def load_inventory(file_path):
     """Load and validate the media inventory Excel file."""
     try:
         df = pd.read_excel(file_path)
-        required_columns = ['File Path', 'Photo Date']
+        required_columns = ['File Path', 'Photo Date', 'Duplicate Status']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:
@@ -37,13 +37,21 @@ def load_inventory(file_path):
         return None
 
 def plan_file_moves(df, root_dir):
-    """Plan file moves based on dates and location."""
+    """Plan file moves based on dates, location, and duplicate status."""
     moves = []
     errors = []
+    status_counts = {'ok': 0, 'duplicate': 0, 'error': 0}
     
     for _, row in df.iterrows():
         try:
             source_path = row['File Path']
+            duplicate_status = row['Duplicate Status'].lower()
+            status_counts[duplicate_status] = status_counts.get(duplicate_status, 0) + 1
+            
+            # Skip files marked as duplicates
+            if duplicate_status == 'duplicate':
+                continue
+                
             if not os.path.exists(source_path):
                 errors.append(f"Source file not found: {source_path}")
                 continue
@@ -63,9 +71,15 @@ def plan_file_moves(df, root_dir):
             # Create target path (only 2 levels: year/date_location)
             target_dir = os.path.join(root_dir, year, date_str)
             filename = os.path.basename(source_path)
+            
+            # For files marked as 'error', add '_dup' suffix before extension
+            if duplicate_status == 'error':
+                base_name, ext = os.path.splitext(filename)
+                filename = f"{base_name}_dup{ext}"
+            
             target_path = os.path.join(target_dir, filename)
             
-            # Handle duplicate filenames
+            # Handle filename collisions
             counter = 1
             base_name, ext = os.path.splitext(filename)
             while os.path.exists(target_path):
@@ -73,12 +87,12 @@ def plan_file_moves(df, root_dir):
                 target_path = os.path.join(target_dir, new_filename)
                 counter += 1
             
-            moves.append((source_path, target_path))
+            moves.append((source_path, target_path, duplicate_status))
             
         except Exception as e:
             errors.append(f"Error processing {row['File Path']}: {str(e)}")
     
-    return moves, errors
+    return moves, errors, status_counts
 
 def execute_moves(moves, dry_run=True):
     """Execute or simulate file moves."""
@@ -86,18 +100,19 @@ def execute_moves(moves, dry_run=True):
         'successful': 0,
         'failed': 0,
         'errors': [],
-        'moves_df': pd.DataFrame(moves, columns=['Source', 'Destination'])
+        'moves_df': pd.DataFrame([(s, d, st) for s, d, st in moves], 
+                               columns=['Source', 'Destination', 'Status'])
     }
     
-    for source, target in moves:
+    for source, target, status in moves:
         try:
             target_dir = os.path.dirname(target)
             
             if dry_run:
-                print(f"Would move:\n  From: {source}\n  To: {target}")
+                print(f"Would move ({status}):\n  From: {source}\n  To: {target}")
             else:
                 os.makedirs(target_dir, exist_ok=True)
-                print(f"Moving:\n  From: {source}\n  To: {target}")
+                print(f"Moving ({status}):\n  From: {source}\n  To: {target}")
                 shutil.move(source, target)
                 results['successful'] += 1
                 
@@ -132,7 +147,7 @@ def main():
     
     # Plan moves
     print("\nPlanning file organization...")
-    moves, errors = plan_file_moves(df, args.root)
+    moves, errors, status_counts = plan_file_moves(df, args.root)
     
     if errors:
         print("\nErrors during planning:")
@@ -149,7 +164,11 @@ def main():
     
     # Print summary
     print("\nSummary:")
-    print(f"  Total files processed: {len(moves)}")
+    print(f"  Total files in inventory: {len(df)}")
+    print(f"  Files marked as OK: {status_counts.get('ok', 0)}")
+    print(f"  Files marked as duplicate (skipped): {status_counts.get('duplicate', 0)}")
+    print(f"  Files marked for rename: {status_counts.get('error', 0)}")
+    print(f"  Total files to process: {len(moves)}")
     if args.prod:
         print(f"  Successfully moved: {results['successful']}")
         print(f"  Failed moves: {results['failed']}")
