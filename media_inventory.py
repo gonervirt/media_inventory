@@ -566,6 +566,7 @@ def main():
         #os.path.expanduser("C:/photo/phone"),
         os.path.expanduser("C:/photo/dell/dest"),
         os.path.expanduser("C:/photo/dell/na"),
+        os.path.expanduser("C:/photo/dell/src"),
         # Add more directories as needed
     ]
     
