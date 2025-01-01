@@ -121,8 +121,22 @@ def extract_date_from_filename(filename):
     return None
 
 def get_video_metadata(file_path):
-    """Extract resolution from video file."""
+    """Extract resolution from video file using hachoir first, then VideoFileClip as fallback."""
     try:
+        # Try hachoir first
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            parser = createParser(file_path)
+            if parser:
+                with parser:
+                    metadata = extractMetadata(parser)
+                    if metadata and hasattr(metadata, 'get'):
+                        width = metadata.get('width', None)
+                        height = metadata.get('height', None)
+                        if width and height:
+                            return f"{width}x{height}"
+
+        # Fallback to VideoFileClip if hachoir didn't work
         if MOVIEPY_AVAILABLE:
             with VideoFileClip(file_path) as clip:
                 width, height = clip.size
@@ -567,12 +581,13 @@ def main():
     
     # List of directories to scan
     directories_to_scan = args.dirs if args.dirs else [
-        os.path.expanduser("C:/photo/dest"),
+        #os.path.expanduser("C:/photo/dest"),
         #os.path.expanduser("~/Pictures"),
         #os.path.expanduser("~/Videos"),
         #os.path.expanduser("~/Downloads"),
         #os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
-        os.path.expanduser("C:/photo/phone")
+        #os.path.expanduser("C:/photo/phone")
+        os.path.expanduser("C:/photo/done/src - Copie/google/takeout-20241224T090448Z-003/Takeout")
         # Add more directories as needed
     ]
     
