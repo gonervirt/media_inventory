@@ -56,9 +56,9 @@ def get_image_metadata(file_path):
             gps_coords = None
             date_taken = None
             
+            
             if hasattr(img, '_getexif') and img._getexif() is not None:
                 exif = {TAGS.get(key, key): value for key, value in img._getexif().items()}
-                
                 # Get GPS coordinates
                 if 'GPSInfo' in exif:
                     try:
@@ -88,10 +88,13 @@ def get_image_metadata(file_path):
                             continue
             
             return resolution, gps_coords, date_taken
+
+    except (IOError, OSError) as e:
+        print(f"Error reading {file_path}: {str(e)}")
+        return None, None, None
     except Exception as e:
         print(f"Error processing {file_path}: {str(e)}")
-        pass
-    return None, None, None
+        return None, None, None
 
 def extract_date_from_filename(filename):
     """Try to extract date from filename using common patterns."""
@@ -121,12 +124,12 @@ def extract_date_from_filename(filename):
     return None
 
 def get_video_metadata(file_path):
-    """Extract resolution from video file using hachoir first, then VideoFileClip as fallback."""
+    """Extract resolution from video file using hachoir only, skip problematic files."""
     try:
-        # Suppress all warnings from hachoir
+        # Only use hachoir, skip VideoFileClip due to Windows errors
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            # Redirect stderr to suppress hachoir's messages
+            # Redirect stderr
             with open(os.devnull, 'w') as devnull:
                 old_stderr = os.dup(2)
                 os.dup2(devnull.fileno(), 2)
@@ -141,42 +144,17 @@ def get_video_metadata(file_path):
                                 if width and height:
                                     return f"{width}x{height}"
                 finally:
-                    # Restore stderr
                     os.dup2(old_stderr, 2)
 
-        # Fallback to VideoFileClip if hachoir didn't work
-        if MOVIEPY_AVAILABLE:
-            with VideoFileClip(file_path) as clip:
-                width, height = clip.size
-                return f"{width}x{height}"
-        else:
-            return "Resolution unavailable (moviepy not installed)"
+        return "Resolution unavailable (metadata not found)"
+
     except Exception as e:
-        print(f"Error processing video {file_path}: {str(e)}")
-    return None
+        # Return generic message instead of error
+        return "Resolution unavailable"
 
 def get_video_gps(file_path):
     """Extract GPS coordinates from video metadata using exifread."""
     try:
-        # First try exifread
-        with open(file_path, 'rb') as f:
-            tags = exifread.process_file(f)
-            
-            # Look for GPS tags
-            if 'GPS GPSLatitude' in tags and 'GPS GPSLongitude' in tags:
-                lat = convert_to_degrees(tags['GPS GPSLatitude'].values)
-                lon = convert_to_degrees(tags['GPS GPSLongitude'].values)
-                
-                # Check for reference (N/S, E/W)
-                if 'GPS GPSLatitudeRef' in tags:
-                    if str(tags['GPS GPSLatitudeRef']) == 'S':
-                        lat = -lat
-                if 'GPS GPSLongitudeRef' in tags:
-                    if str(tags['GPS GPSLongitudeRef']) == 'W':
-                        lon = -lon
-                
-                return f"{lat:.6f}, {lon:.6f}"
-        
         # If no GPS found with exifread, try hachoir as fallback
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -204,6 +182,9 @@ def get_video_gps(file_path):
                             return f"{lat:.6f}, {lon:.6f}"
                     
     except Exception as e:
+        # Silently fail for file format errors
+        if "format not recognized" in str(e).lower():
+            return None
         print(f"Error extracting GPS from video {file_path}: {str(e)}")
     return None
 
@@ -216,29 +197,28 @@ def process_videos_in_parallel(video_files, max_workers=None):
     print(f"\nProcessing {total_videos} videos...")
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_file = {executor.submit(get_video_metadata, file): file for file in video_files}
+        futures = {executor.submit(get_video_metadata, file): file for file in video_files}
         
-        for future in concurrent.futures.as_completed(future_to_file):
-            file = future_to_file[future]
+        for future in concurrent.futures.as_completed(futures):
+            file = futures[future]
             try:
                 resolution = future.result()
                 resolutions[file] = resolution
                 
-                # Update progress
+                # Update progress without error messages
                 completed += 1
                 percentage = (completed / total_videos) * 100
-                print(f"\rVideo processing progress: {completed}/{total_videos} ({percentage:.1f}%) - Current: {os.path.basename(file)}", 
+                print(f"\rVideo processing progress: {completed}/{total_videos} ({percentage:.1f}%)", 
                       end="", flush=True)
                 
-            except Exception as e:
-                print(f"\nError processing {file}: {str(e)}")
-                resolutions[file] = None
+            except Exception:
+                resolutions[file] = "Resolution unavailable"
     
     print("\nVideo processing completed.")
     return resolutions
 
 def get_file_type(file_path):
-    """Determine if the file is a photo or video based on extension and content."""
+    """Determine if the file is a photo or video based on extension."""
     # Files to ignore
     system_files = {'desktop.ini', 'thumbs.db', '.ds_store'}
     if os.path.basename(file_path).lower() in system_files:
@@ -249,24 +229,12 @@ def get_file_type(file_path):
     
     ext = Path(file_path).suffix.lower()
     
-    # First check extension
-    if ext not in photo_extensions and ext not in video_extensions:
-        return None
+    # Simply check extension
+    if ext in photo_extensions:
+        return 'Photo'
+    elif ext in video_extensions:
+        return 'Video'
     
-    try:
-        # Then check mime type
-        mime = magic.from_file(file_path, mime=True)
-        if mime.startswith('image/') and ext in photo_extensions:
-            return 'Photo'
-        elif mime.startswith('video/') and ext in video_extensions:
-            return 'Video'
-        # If mime type check fails, fall back to extension only
-        if ext in photo_extensions:
-            return 'Photo'
-        elif ext in video_extensions:
-            return 'Video'
-    except:
-        return None
     return None
 
 def save_checkpoint(media_files, processed_files, checkpoint_file, count, enable_checkpoints=False):
@@ -525,8 +493,9 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limi
                                                  min(creation_date, modified_date))
                     else:  # Video
                         file_info['Resolution'] = None  # Will be updated later
-                        file_info['GPS Coordinates'] = get_video_gps(file_path)
+                        #file_info['GPS Coordinates'] = get_video_gps(file_path)
                         file_info['Photo Date'] = extract_date_from_filename(file_data['file_name'])
+
                     
                     media_files.append(file_info)
                     processed_files.add(file_path)
