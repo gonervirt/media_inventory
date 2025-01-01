@@ -589,12 +589,13 @@ def main():
         #os.path.expanduser("~/Pictures"),
         #os.path.expanduser("~/Videos"),
         #os.path.expanduser("~/Downloads"),
-        #os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
+        os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
         #os.path.expanduser("C:/photo/phone"),
         #os.path.expanduser("C:/photo/dell/dest"),
         #os.path.expanduser("C:/photo/dell/na"),
-        #os.path.expanduser("C:/photo/dell/src"),
-        os.path.expanduser("C:/photo/local"),  
+        #os.path.expanduser("C:/photo/src"),
+        #os.path.expanduser("C:/photo/local"), 
+        os.path.expanduser("C:/photo/done"),  
         # Add more directories as needed
     ]
     

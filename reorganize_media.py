@@ -44,8 +44,12 @@ def plan_file_moves(df, root_dir):
         'ok': 0, 
         'duplicate': 0, 
         'error': 0,
-        'skipped': 0  # For files that don't need moving
+        'skipped': 0,
+        'default_date': 0  # Count files using default date
     }
+    
+    # Default date for files without valid dates
+    DEFAULT_DATE = pd.Timestamp('1980-01-01').date()
     
     for _, row in df.iterrows():
         try:
@@ -63,8 +67,16 @@ def plan_file_moves(df, root_dir):
                 errors.append(f"Source file not found: {source_path}")
                 continue
             
-            # Convert date to required format
-            photo_date = pd.to_datetime(row['Photo Date']).date()
+            # Convert date to required format with fallback
+            try:
+                photo_date = pd.to_datetime(row['Photo Date']).date()
+                if pd.isna(photo_date):
+                    photo_date = DEFAULT_DATE
+                    status_counts['default_date'] += 1
+            except (ValueError, AttributeError):
+                photo_date = DEFAULT_DATE
+                status_counts['default_date'] += 1
+            
             year = str(photo_date.year)
             date_str = photo_date.strftime('%Y-%m-%d')
             
@@ -197,6 +209,7 @@ def main():
     print("\nSummary:")
     print(f"  Total files in inventory: {len(df)}")
     print(f"  Files already in place (skipped): {status_counts.get('skipped', 0)}")
+    print(f"  Files with default date (1980-01-01): {status_counts.get('default_date', 0)}")
     print(f"  Files marked as OK: {status_counts.get('ok', 0)}")
     print(f"  Files marked as duplicate (skipped): {status_counts.get('duplicate', 0)}")
     print(f"  Files marked for rename: {status_counts.get('error', 0)}")
