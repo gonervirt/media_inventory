@@ -123,18 +123,26 @@ def extract_date_from_filename(filename):
 def get_video_metadata(file_path):
     """Extract resolution from video file using hachoir first, then VideoFileClip as fallback."""
     try:
-        # Try hachoir first
+        # Suppress all warnings from hachoir
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            parser = createParser(file_path)
-            if parser:
-                with parser:
-                    metadata = extractMetadata(parser)
-                    if metadata and hasattr(metadata, 'get'):
-                        width = metadata.get('width', None)
-                        height = metadata.get('height', None)
-                        if width and height:
-                            return f"{width}x{height}"
+            # Redirect stderr to suppress hachoir's messages
+            with open(os.devnull, 'w') as devnull:
+                old_stderr = os.dup(2)
+                os.dup2(devnull.fileno(), 2)
+                try:
+                    parser = createParser(file_path)
+                    if parser:
+                        with parser:
+                            metadata = extractMetadata(parser)
+                            if metadata and hasattr(metadata, 'get'):
+                                width = metadata.get('width', None)
+                                height = metadata.get('height', None)
+                                if width and height:
+                                    return f"{width}x{height}"
+                finally:
+                    # Restore stderr
+                    os.dup2(old_stderr, 2)
 
         # Fallback to VideoFileClip if hachoir didn't work
         if MOVIEPY_AVAILABLE:
