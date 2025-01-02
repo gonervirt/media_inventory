@@ -18,6 +18,8 @@ from hachoir.parser import createParser
 from hachoir.metadata import extractMetadata
 import warnings
 import exifread
+import configparser
+from typing import List
 
 try:
     from moviepy import VideoFileClip
@@ -575,6 +577,22 @@ def scan_directories(root_dirs, lookup_locations=False, max_workers=8, test_limi
     
     return media_files
 
+def load_config(config_file='config.ini') -> List[str]:
+    """Load directories from configuration file."""
+    config = configparser.ConfigParser()
+    directories = []
+    
+    try:
+        config.read(config_file)
+        if 'Directories' in config and 'scan_dirs' in config['Directories']:
+            # Split on newlines and filter out empty lines
+            dirs = [d.strip() for d in config['Directories']['scan_dirs'].split('\n') if d.strip()]
+            directories.extend(map(os.path.expanduser, dirs))
+    except Exception as e:
+        print(f"Warning: Error reading config file: {str(e)}")
+    
+    return directories
+
 def main():
     parser = argparse.ArgumentParser(description='Media Inventory Scanner')
     parser.add_argument('--test', type=int, help='Limit processing to specified number of files (for testing)')
@@ -583,24 +601,30 @@ def main():
     parser.add_argument('--enable-checkpoints', action='store_true', help='Enable writing checkpoint files to disk')
     args = parser.parse_args()
     
-    # List of directories to scan
-    directories_to_scan = args.dirs if args.dirs else [
-        os.path.expanduser("C:/photo/dest"),
-        #os.path.expanduser("~/Pictures"),
-        #os.path.expanduser("~/Videos"),
-        #os.path.expanduser("~/Downloads"),
-        os.path.expanduser("C:/Users/sebas/OneDrive/Images/Pellicule"),  # Often contains media files
-        #os.path.expanduser("C:/photo/phone"),
-        #os.path.expanduser("C:/photo/dell/dest"),
-        #os.path.expanduser("C:/photo/dell/na"),
-        #os.path.expanduser("C:/photo/src"),
-        #os.path.expanduser("C:/photo/local"), 
-        os.path.expanduser("C:/photo/done"),  
-        # Add more directories as needed
+    # Define default directories
+    default_directories = [
+        os.path.expanduser("C:/photo/"),
     ]
     
+    # Load directories from config file
+    config_directories = load_config()
+    
+    # Combine directories with priority:
+    # 1. Command line arguments (highest priority)
+    # 2. Configuration file
+    # 3. Default directories (lowest priority)
+    directories_to_scan = args.dirs if args.dirs else (config_directories if config_directories else default_directories)
+    
     print("Starting media inventory scan...")
-    print("Will scan the following directories:")
+    print("\nScanning directories from:")
+    if args.dirs:
+        print("- Command line arguments")
+    elif config_directories:
+        print("- Configuration file")
+    else:
+        print("- Default settings")
+        
+    print("\nDirectories to scan:")
     for dir in directories_to_scan:
         print(f"- {dir}")
     
