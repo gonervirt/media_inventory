@@ -65,7 +65,7 @@ This script scans specified directories for photos and videos, collecting inform
 - .mkv
 - .webm
 
-example:
-python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest
-python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest --prod
-python "unzip_files.py" --source "C:/photo/dell zip" --dest C:/photo/unzip
+### example:
+- python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest
+- python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest --prod
+- python "unzip_files.py" --source "C:/photo/dell zip" --dest C:/photo/unzip
