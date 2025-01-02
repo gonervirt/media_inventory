@@ -603,7 +603,7 @@ def main():
     
     # Define default directories
     default_directories = [
-        os.path.expanduser("C:/photo/"),
+    #    os.path.expanduser("C:/photo/"),
     ]
     
     # Load directories from config file
