@@ -11,8 +11,8 @@ def setup_parser():
     parser = argparse.ArgumentParser(description='Reorganize media files in subfolders')
     parser.add_argument('--source', type=str, required=True,
                        help='Source directory containing media files')
-    parser.add_argument('--dry-run', action='store_true', default=True,
-                       help='Perform a dry run without moving files (default: True)')
+    parser.add_argument('--prod', action='store_true',
+                       help='Execute the actual file moves and directory deletions. Without this, only shows planned moves')
     parser.add_argument('--output', type=str, default='planned_moves.xlsx',
                        help='Output Excel file for planned moves (default: planned_moves.xlsx)')
     return parser
@@ -101,16 +101,19 @@ def reorganize_by_location(moves, empty_dirs):
                 target_folder = current_folder
     return additional_moves
 
-def execute_moves(moves, dry_run=True):
+def execute_moves(moves, prod=False):
     """Execute or simulate file moves."""
     total_moves = len(moves)
     for idx, (source, target, target_folder) in enumerate(moves, 1):
-        if dry_run:
+        if not prod:
             print(f"Would move: {source} -> {target}")
         else:
-            os.makedirs(target_folder, exist_ok=True)
-            shutil.move(source, target)
-            print(f"Moved: {source} -> {target}")
+            if os.path.exists(source):
+                os.makedirs(target_folder, exist_ok=True)
+                shutil.move(source, target)
+                print(f"Moved: {source} -> {target}")
+            else:
+                print(f"Error: Source file not found: {source}")
         print(f"Progress: {idx}/{total_moves} ({(idx / total_moves) * 100:.2f}%)")
 
 def save_moves_to_excel(moves, output_path):
@@ -131,7 +134,7 @@ def main():
     print("Reorganizing Media Files")
     print("========================")
     print(f"Source directory: {source_dir}")
-    print(f"Dry run mode: {'enabled' if args.dry_run else 'disabled'}")
+    print(f"Dry run mode: {'disabled' if args.prod else 'enabled'}")
     
     subfolders = find_subfolders_to_merge(source_dir)
     #print(f"Subfolders found: {subfolders}")  # Debugging information
@@ -142,12 +145,12 @@ def main():
         return
     
     # Execute initial moves
-    execute_moves(moves, dry_run=args.dry_run)
+    execute_moves(moves, prod=args.prod)
     
     # Plan additional moves based on location
     additional_moves = reorganize_by_location(moves, empty_dirs)
     if additional_moves:
-        execute_moves(additional_moves, dry_run=args.dry_run)
+        execute_moves(additional_moves, prod=args.prod)
         moves.extend(additional_moves)
     
     save_moves_to_excel(moves, args.output)
@@ -156,6 +159,12 @@ def main():
         print("\nDirectories that will be empty and need to be removed:")
         for dir in empty_dirs:
             print(f"- {dir}")
+            if args.prod:
+                try:
+                    shutil.rmtree(dir)
+                    print(f"Removed directory: {dir}")
+                except OSError as e:
+                    print(f"Error removing directory {dir}: {e}")
     
     print("\nReorganization completed!")
 
