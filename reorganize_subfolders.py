@@ -4,6 +4,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
 import shutil
+from collections import defaultdict
 
 def setup_parser():
     """Configure command line arguments."""
@@ -43,11 +44,20 @@ def find_subfolders_to_merge(source_dir):
 
 def plan_moves(subfolders):
     """Plan moves to merge subfolders."""
+    preferred_locations = ["Royan", "Niort", "Le Mont-Saint-Michel", "Tinténiac", "Saint-Malo", "Brest", "Barbatre", "Champagnole", "Geneve", "Jullouville", "Betton"]
     moves = []
+    empty_dirs = set()  # Use a set to ensure uniqueness
     for date, folders in subfolders.items():
         if len(folders) > 1:
-            # Select the target folder with a location
-            target_folder = next((folder for folder in folders if '_' in os.path.basename(folder)), folders[0])
+            # Select the target folder with a preferred location in order
+            target_folder = None
+            for loc in preferred_locations:
+                target_folder = next((folder for folder in folders if loc in os.path.basename(folder)), None)
+                if target_folder:
+                    break
+            if not target_folder:
+                # If no preferred location, select any folder with a location
+                target_folder = next((folder for folder in folders if '_' in os.path.basename(folder)), folders[0])
             for folder in folders:
                 if folder != target_folder:
                     for root, _, files in os.walk(folder):
@@ -56,9 +66,40 @@ def plan_moves(subfolders):
                             target_path = os.path.join(target_folder, file)
                             moves.append((source_path, target_path, target_folder))
                             print(f"Planned move: {source_path} -> {target_path}")  # Debugging information
+                    empty_dirs.add(folder)
         else:
             print(f"Skipping date {date} with only one folder")  # Debugging information
-    return moves
+    return moves, empty_dirs
+
+def reorganize_by_location(moves, empty_dirs):
+    """Reorganize directories by merging those with the same location."""
+    location_groups = defaultdict(list)
+    for _, target_path, _ in moves:
+        target_dir = os.path.dirname(target_path)
+        date, location = parse_directory_name(os.path.basename(target_dir))
+        if location:
+            location_groups[location].append((date, target_dir))
+    
+    additional_moves = []
+    for location, dirs in location_groups.items():
+        # Sort directories by date
+        dirs.sort()
+        target_folder = dirs[0][1]
+        for i in range(1, len(dirs)):
+            current_date, current_folder = dirs[i]
+            previous_date, previous_folder = dirs[i - 1]
+            if (current_date - previous_date).days <= 14:
+                for root, _, files in os.walk(current_folder):
+                    for file in files:
+                        source_path = os.path.join(root, file)
+                        target_path = os.path.join(target_folder, file)
+                        if os.path.normpath(source_path) != os.path.normpath(target_path):
+                            additional_moves.append((source_path, target_path, target_folder))
+                            print(f"Additional planned move: {source_path} -> {target_path}")  # Debugging information
+                empty_dirs.add(current_folder)
+            else:
+                target_folder = current_folder
+    return additional_moves
 
 def execute_moves(moves, dry_run=True):
     """Execute or simulate file moves."""
@@ -94,14 +135,27 @@ def main():
     
     subfolders = find_subfolders_to_merge(source_dir)
     #print(f"Subfolders found: {subfolders}")  # Debugging information
-    moves = plan_moves(subfolders)
+    moves, empty_dirs = plan_moves(subfolders)
     
     if not moves:
         print("\nNo moves planned.")
         return
     
+    # Execute initial moves
     execute_moves(moves, dry_run=args.dry_run)
+    
+    # Plan additional moves based on location
+    additional_moves = reorganize_by_location(moves, empty_dirs)
+    if additional_moves:
+        execute_moves(additional_moves, dry_run=args.dry_run)
+        moves.extend(additional_moves)
+    
     save_moves_to_excel(moves, args.output)
+    
+    if empty_dirs:
+        print("\nDirectories that will be empty and need to be removed:")
+        for dir in empty_dirs:
+            print(f"- {dir}")
     
     print("\nReorganization completed!")
 
