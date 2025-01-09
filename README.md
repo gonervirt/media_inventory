@@ -69,3 +69,9 @@ This script scans specified directories for photos and videos, collecting inform
 - python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest
 - python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest --prod
 - python "unzip_files.py" --source "C:/photo/dell zip" --dest C:/photo/unzip
+
+# Dry run (default)
+python reorganize_subfolders.py --source "C:/path/to/source"
+
+# Actual move
+python reorganize_subfolders.py --source "C:/path/to/source" --dry-run False
