@@ -27,7 +27,13 @@ def parse_directory_name(directory_name):
             return date, location
         except ValueError:
             return None, None
-    return None, None
+    else:
+        try:
+            date = datetime.strptime(parts[0], '%Y-%m-%d')
+            print(f"Found date: {date}")  # Debugging information
+            return date, None
+        except ValueError:
+            return None, None
 
 def find_subfolders_to_merge(source_dir):
     """Find subfolders to merge based on date and location."""
@@ -36,7 +42,7 @@ def find_subfolders_to_merge(source_dir):
         print(f"Processing directory: {root}")  # Debugging information
         for dir_name in dirs:
             date, location = parse_directory_name(dir_name)
-            if date and location:
+            if date:
                 key = date
                 subfolders.setdefault(key, []).append(os.path.join(root, dir_name))
                 print(f"Found subfolder: {os.path.join(root, dir_name)} with key: {key}")  # Debugging information
@@ -48,6 +54,7 @@ def plan_moves(subfolders):
     moves = []
     empty_dirs = set()  # Use a set to ensure uniqueness
     for date, folders in subfolders.items():
+        print (f'{date} {folders}')  # Debugging information
         if len(folders) > 1:
             # Select the target folder with a preferred location in order
             target_folder = None
@@ -101,7 +108,7 @@ def reorganize_by_location(moves, empty_dirs):
                 target_folder = current_folder
     return additional_moves
 
-def execute_moves(moves, prod=False):
+def execute_moves(moves, source_dir, prod=False):
     """Execute or simulate file moves."""
     total_moves = len(moves)
     for idx, (source, target, target_folder) in enumerate(moves, 1):
@@ -115,6 +122,26 @@ def execute_moves(moves, prod=False):
             else:
                 print(f"Error: Source file not found: {source}")
         print(f"Progress: {idx}/{total_moves} ({(idx / total_moves) * 100:.2f}%)")
+    
+    # Check for empty directories
+    empty_dirs = set()
+    for root, dirs, files in os.walk(source_dir):
+        for dir_name in dirs:
+            dir_path = os.path.join(root, dir_name)
+            if not os.listdir(dir_path):  # Directory is empty
+                empty_dirs.add(dir_path)
+    
+    if prod:
+        for dir_path in empty_dirs:
+            try:
+                shutil.rmtree(dir_path)
+                print(f"Removed empty directory: {dir_path}")
+            except OSError as e:
+                print(f"Error removing directory {dir_path}: {e}")
+    else:
+        print("\nEmpty directories that would be removed:")
+        for dir_path in empty_dirs:
+            print(f"- {dir_path}")
 
 def save_moves_to_excel(moves, output_path):
     """Save the planned moves to an Excel file."""
@@ -145,12 +172,12 @@ def main():
         return
     
     # Execute initial moves
-    execute_moves(moves, prod=args.prod)
+    execute_moves(moves, source_dir, prod=args.prod)
     
     # Plan additional moves based on location
     additional_moves = reorganize_by_location(moves, empty_dirs)
     if additional_moves:
-        execute_moves(additional_moves, prod=args.prod)
+        execute_moves(additional_moves, source_dir, prod=args.prod)
         moves.extend(additional_moves)
     
     save_moves_to_excel(moves, args.output)
