@@ -108,7 +108,7 @@ def reorganize_by_location(moves, empty_dirs):
                 target_folder = current_folder
     return additional_moves
 
-def execute_moves(moves, source_dir, prod=False):
+def execute_moves(moves, prod=False):
     """Execute or simulate file moves."""
     total_moves = len(moves)
     for idx, (source, target, target_folder) in enumerate(moves, 1):
@@ -122,8 +122,9 @@ def execute_moves(moves, source_dir, prod=False):
             else:
                 print(f"Error: Source file not found: {source}")
         print(f"Progress: {idx}/{total_moves} ({(idx / total_moves) * 100:.2f}%)")
-    
-    # Check for empty directories
+
+def remove_empty_dirs(source_dir, prod=False):
+    """Remove empty directories or print them in dry run mode."""
     empty_dirs = set()
     for root, dirs, files in os.walk(source_dir):
         for dir_name in dirs:
@@ -164,34 +165,25 @@ def main():
     print(f"Dry run mode: {'disabled' if args.prod else 'enabled'}")
     
     subfolders = find_subfolders_to_merge(source_dir)
-    #print(f"Subfolders found: {subfolders}")  # Debugging information
     moves, empty_dirs = plan_moves(subfolders)
     
+    
+    # Plan additional moves based on location
+    additional_moves = reorganize_by_location(moves, empty_dirs)
+    moves.extend(additional_moves)
+
     if not moves:
         print("\nNo moves planned.")
         return
     
-    # Execute initial moves
-    execute_moves(moves, source_dir, prod=args.prod)
+    # Execute all moves
+    execute_moves(moves, prod=args.prod)
     
-    # Plan additional moves based on location
-    additional_moves = reorganize_by_location(moves, empty_dirs)
-    if additional_moves:
-        execute_moves(additional_moves, source_dir, prod=args.prod)
-        moves.extend(additional_moves)
+    # Remove empty directories
+    remove_empty_dirs(source_dir, prod=args.prod)
     
+    # Save moves to Excel
     save_moves_to_excel(moves, args.output)
-    
-    if empty_dirs:
-        print("\nDirectories that will be empty and need to be removed:")
-        for dir in empty_dirs:
-            print(f"- {dir}")
-            if args.prod:
-                try:
-                    shutil.rmtree(dir)
-                    print(f"Removed directory: {dir}")
-                except OSError as e:
-                    print(f"Error removing directory {dir}: {e}")
     
     print("\nReorganization completed!")
 
