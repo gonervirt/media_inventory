@@ -33,6 +33,8 @@ This script scans specified directories for photos and videos, collecting inform
        # Add more directories as needed
    ]
    ```
+   python ".\media_inventory.py"
+   python ".\media_inventory.py" --lookup-locations 
 
 2. Run the script:
    ```bash
@@ -66,9 +68,9 @@ This script scans specified directories for photos and videos, collecting inform
 - .webm
 
 ### example:
-- python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest
-- python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/dest --prod
-- python "unzip_files.py" --source "C:/photo/dell zip" --dest C:/photo/unzip
+- python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/target
+- python "reorganize_media.py" --inventory "media_inventory.xlsx" --root C:/photo/target --prod
+- python "unzip_files.py" --source "C:\photo\google_2025-11-11" --dest C:/photo/unzip_seb
 
 # Dry run (default)
 python reorganize_subfolders.py --source "C:/path/to/source"

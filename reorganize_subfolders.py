@@ -123,6 +123,7 @@ def execute_moves(moves, prod=False):
                 print(f"Error: Source file not found: {source}")
         print(f"Progress: {idx}/{total_moves} ({(idx / total_moves) * 100:.2f}%)")
 
+#
 def remove_empty_dirs(source_dir, prod=False):
     """Remove empty directories or print them in dry run mode."""
     empty_dirs = set()
@@ -174,7 +175,7 @@ def main():
 
     if not moves:
         print("\nNo moves planned.")
-        return
+        #return
     
     # Execute all moves
     execute_moves(moves, prod=args.prod)

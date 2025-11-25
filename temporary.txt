@@ -1,0 +1,49 @@
+temporary.txt
+
+[Directories]
+scan_dirs = 
+    C:\photo\unzip
+    C:\photo\Tel Armelle
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2024
+
+
+        C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2015
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2016
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2017
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2018
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2019
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2020
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2021
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2022
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2023
+
+
+        C:\photo\unzip_seb
+    C:\photo\unzip_armelle
+
+        C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2015
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2016
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2017
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2018
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2019
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2020
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2021
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2022
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2023
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2024
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2025
+
+
+        C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2015
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2016
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2017
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2018
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2019
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2020
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2021
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2022
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2023
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2024
+    C:\Users\sebas\OneDrive\photo_famille\Photo Numerique\2025
+    C:\photo\target
+    C:\photo\target_reorg

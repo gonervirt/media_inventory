@@ -152,7 +152,7 @@ def execute_moves(moves, dry_run=True):
             else:
                 os.makedirs(target_dir, exist_ok=True)
                 print(f"Moving ({status}):\n  From: {source}\n  To: {target}")
-                shutil.move(source, target)
+                shutil.copy2(source, target)
                 results['successful'] += 1
                 
         except Exception as e:

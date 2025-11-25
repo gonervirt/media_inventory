@@ -617,6 +617,8 @@ def main():
     directories_to_scan = args.dirs if args.dirs else (config_directories if config_directories else default_directories)
     
     print("Starting media inventory scan...")
+    
+    
     print("\nScanning directories from:")
     if args.dirs:
         print("- Command line arguments")
